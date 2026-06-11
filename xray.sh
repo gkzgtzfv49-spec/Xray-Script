@@ -305,7 +305,11 @@ install_protocol() {
   echo ""
   echo -e "  ${BOLD}1.${NC} Trojan + TLS"
   echo -e "  ${BOLD}2.${NC} VLESS + TLS"
-  echo -e "  ${BOLD}0.${NC} Назад"
+  if [[ "${FIRST_INSTALL}" == "1" ]]; then
+    echo -e "  ${BOLD}0.${NC} Пропустить"
+  else
+    echo -e "  ${BOLD}0.${NC} Назад"
+  fi
   echo ""
   read -rp "  Выбор: " PC
 
@@ -788,7 +792,11 @@ print('✓ подключён' if 'WARP' in tags else '✗ не настроен
   echo -e "  ${BOLD}3.${NC} Роутить домены через WARP"
   echo -e "  ${BOLD}4.${NC} Удалить WARP из конфига"
   echo -e "  ${BOLD}5.${NC} Статус WARP"
-  echo -e "  ${BOLD}0.${NC} Назад"
+  if [[ "${FIRST_INSTALL}" == "1" ]]; then
+    echo -e "  ${BOLD}0.${NC} Пропустить"
+  else
+    echo -e "  ${BOLD}0.${NC} Назад"
+  fi
   echo ""
   read -rp "  Выбор: " WM
 
@@ -829,7 +837,11 @@ print('✓ настроен' if 'MULTIHOP' in tags else '✗ не настрое
   echo -e "  ${BOLD}1.${NC} Настроить multihop (добавить Сервер 2)"
   echo -e "  ${BOLD}2.${NC} Показать данные для подключения цепочки"
   echo -e "  ${BOLD}3.${NC} Удалить multihop"
-  echo -e "  ${BOLD}0.${NC} Назад"
+  if [[ "${FIRST_INSTALL}" == "1" ]]; then
+    echo -e "  ${BOLD}0.${NC} Пропустить"
+  else
+    echo -e "  ${BOLD}0.${NC} Назад"
+  fi
   echo ""
   read -rp "  Выбор: " MC
 
@@ -1236,9 +1248,10 @@ ln -sf /root/xray.sh /usr/local/bin/xray-manage 2>/dev/null || true
 chmod +x /usr/local/bin/xray-manage 2>/dev/null || true
 
 echo ""
-echo -e "${GREEN}  Система готова! Выбери протокол:${NC}"
+echo -e "${GREEN}  Система готова! Выбери протокол (можно пропустить):${NC}"
+FIRST_INSTALL=1
 install_protocol
 
-echo ""
-echo -e "${GREEN}  Для управления в любой момент: ${CYAN}xray-manage${NC}"
+# если пользователь нажал Назад — открываем меню
+menu
 echo ""
