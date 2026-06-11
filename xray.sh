@@ -306,7 +306,7 @@ install_protocol() {
   echo -e "  ${BOLD}1.${NC} Trojan + TLS"
   echo -e "  ${BOLD}2.${NC} VLESS + TLS"
   if [[ "${FIRST_INSTALL}" != "1" ]]; then
-    echo -e "  ${BOLD}0.${NC} Назад"
+    echo -e "  ${BOLD}0.${NC} Пропустить (вернуться в меню)"
   fi
   echo ""
   read -rp "  Выбор: " PC
@@ -1138,7 +1138,7 @@ menu() {
     echo -e "  ${BOLD}5.${NC} Показать все ссылки и QR"
     echo ""
     echo -e "  ${BOLD}── Протокол ──${NC}"
-    echo -e "  ${BOLD}6.${NC} Сменить протокол (переустановка)"
+    echo -e "  ${BOLD}6.${NC} Установить или переустановить протокол"
     echo ""
     echo -e "  ${BOLD}── Дополнительно ──${NC}"
     echo -e "  ${BOLD}7.${NC} WARP (обход блокировок)"
