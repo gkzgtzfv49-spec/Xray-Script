@@ -305,9 +305,7 @@ install_protocol() {
   echo ""
   echo -e "  ${BOLD}1.${NC} Trojan + TLS"
   echo -e "  ${BOLD}2.${NC} VLESS + TLS"
-  if [[ "${FIRST_INSTALL}" != "1" ]]; then
-    echo -e "  ${BOLD}0.${NC} Пропустить (вернуться в меню)"
-  fi
+  echo -e "  ${BOLD}0.${NC} Назад"
   echo ""
   read -rp "  Выбор: " PC
 
@@ -361,7 +359,7 @@ install_protocol() {
 
 
 
-    0) [[ "${FIRST_INSTALL}" == "1" ]] && { echo -e "${RED}Сначала выбери протокол!${NC}"; sleep 1; install_protocol; return; } || return ;;
+    0) return ;;
     *) echo -e "${RED}Неверный выбор${NC}"; sleep 1; return ;;
   esac
 
@@ -1239,7 +1237,6 @@ chmod +x /usr/local/bin/xray-manage 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}  Система готова! Выбери протокол:${NC}"
-FIRST_INSTALL=1
 install_protocol
 
 echo ""
