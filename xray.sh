@@ -344,9 +344,25 @@ install_protocol() {
       ask_port
       [[ "$PC" == "1" ]] && ask_users "trojan" || ask_users "vless"
 
+      # ── проверяем есть ли уже сертификат ──
+      local CERT_DAYS
+      CERT_DAYS=$(check_cert_status)
       echo ""
-      echo -e "${YELLOW}  Получаю сертификат...${NC}"
-      ask_tls_cert "$DOMAIN" "$EMAIL"
+      if [[ "$CERT_DAYS" =~ ^[0-9]+$ ]] && [[ "$CERT_DAYS" -gt 0 ]]; then
+        echo -e "  ${GREEN}✓ Найден действующий сертификат ($CERT_DAYS дней)${NC}"
+        echo ""
+        echo -e "  Использовать существующий или получить новый?"
+        echo -e "  1. Использовать существующий"
+        echo -e "  2. Получить новый для домена $DOMAIN"
+        read -rp "  Выбор [1]: " CERT_CHOICE; CERT_CHOICE=${CERT_CHOICE:-1}
+        if [[ "$CERT_CHOICE" == "2" ]]; then
+          echo -e "${YELLOW}  Получаю сертификат...${NC}"
+          ask_tls_cert "$DOMAIN" "$EMAIL"
+        fi
+      else
+        echo -e "${YELLOW}  Получаю сертификат...${NC}"
+        ask_tls_cert "$DOMAIN" "$EMAIL"
+      fi
       echo -e "  ✓ Сертификат готов"
 
       echo -e "${YELLOW}  Записываю конфиг...${NC}"
@@ -1123,6 +1139,93 @@ print('OK')
   echo -e "  ✓ ${GREEN}Multihop удалён, прямое подключение восстановлено${NC}"
 }
 
+
+# ══════════════════════════════════════════════════
+# МЕНЮ СЕРТИФИКАТОВ
+# ══════════════════════════════════════════════════
+check_cert_status() {
+  if [[ ! -f "$CERT_DIR/cert.pem" ]] || [[ ! -s "$CERT_DIR/cert.pem" ]]; then
+    echo "none"
+    return
+  fi
+  local EXPIRY DAYS
+  EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_DIR/cert.pem" 2>/dev/null | cut -d= -f2)
+  [[ -z "$EXPIRY" ]] && echo "invalid" && return
+  DAYS=$(( ( $(date -d "$EXPIRY" +%s 2>/dev/null || date -j -f "%b %d %H:%M:%S %Y %Z" "$EXPIRY" +%s 2>/dev/null) - $(date +%s) ) / 86400 ))
+  echo "$DAYS"
+}
+
+cert_menu() {
+  set +e
+  while true; do
+    clear
+    echo -e "${CYAN}"
+    echo "╔════════════════════════════════════════════╗"
+    echo "║          Xray — Сертификаты TLS            ║"
+    echo "╚════════════════════════════════════════════╝"
+    echo -e "${NC}"
+
+    local CERT_DAYS
+    CERT_DAYS=$(check_cert_status)
+
+    echo -e "  Статус сертификата:"
+    if [[ "$CERT_DAYS" == "none" ]]; then
+      echo -e "  ${RED}✗ Сертификат не найден${NC}"
+    elif [[ "$CERT_DAYS" == "invalid" ]]; then
+      echo -e "  ${RED}✗ Сертификат повреждён${NC}"
+    elif [[ "$CERT_DAYS" -le 0 ]]; then
+      echo -e "  ${RED}✗ Сертификат истёк!${NC}"
+    elif [[ "$CERT_DAYS" -le 14 ]]; then
+      echo -e "  ${YELLOW}⚠ Истекает через $CERT_DAYS дней${NC}"
+    else
+      echo -e "  ${GREEN}✓ Действителен ещё $CERT_DAYS дней${NC}"
+    fi
+
+    echo ""
+    echo -e "  ${BOLD}1.${NC} Получить/обновить сертификат (Let's Encrypt)"
+    echo -e "  ${BOLD}2.${NC} Принудительно обновить сертификат"
+    echo -e "  ${BOLD}3.${NC} Показать информацию о сертификате"
+    echo -e "  ${BOLD}0.${NC} Назад"
+    echo ""
+    read -rp "  Выбор: " CC
+
+    case $CC in
+      1|2)
+        echo ""
+        read -rp "  Домен: " CERT_DOMAIN
+        [[ -z "$CERT_DOMAIN" ]] && { echo -e "${RED}Домен пустой!${NC}"; sleep 1; continue; }
+        while true; do
+          read -rp "  Email для Let's Encrypt: " CERT_EMAIL
+          if [[ -z "$CERT_EMAIL" ]]; then
+            echo -e "  ${RED}Email пустой!${NC}"
+          elif [[ ! "$CERT_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            echo -e "  ${RED}Некорректный email. Только латинские символы!${NC}"
+          else
+            break
+          fi
+        done
+        echo ""
+        echo -e "${YELLOW}  Получаю сертификат...${NC}"
+        ask_tls_cert "$CERT_DOMAIN" "$CERT_EMAIL"
+        echo -e "  ✓ ${GREEN}Готово!${NC}"
+        echo ""
+        read -rp "  Enter..." _
+        ;;
+      3)
+        echo ""
+        if [[ ! -f "$CERT_DIR/cert.pem" ]]; then
+          echo -e "  ${RED}Сертификат не найден${NC}"
+        else
+          openssl x509 -in "$CERT_DIR/cert.pem" -noout -subject -dates -issuer 2>/dev/null ||             echo -e "  ${RED}Ошибка чтения сертификата${NC}"
+        fi
+        echo ""
+        read -rp "  Enter..." _
+        ;;
+      0) return ;;
+    esac
+  done
+}
+
 menu() {
   set +e
   local DOMAIN=$(get_domain)
@@ -1149,15 +1252,16 @@ menu() {
     echo ""
     echo -e "  ${BOLD}── Протокол ──${NC}"
     echo -e "  ${BOLD}6.${NC} Установить или переустановить протокол"
+    echo -e "  ${BOLD}7.${NC} Сертификаты TLS"
     echo ""
     echo -e "  ${BOLD}── Дополнительно ──${NC}"
-    echo -e "  ${BOLD}7.${NC} WARP (обход блокировок)"
-    echo -e "  ${BOLD}8.${NC} Multihop (цепочка серверов)"
+    echo -e "  ${BOLD}8.${NC} WARP (обход блокировок)"
+    echo -e "  ${BOLD}9.${NC} Multihop (цепочка серверов)"
     echo ""
     echo -e "  ${BOLD}── Система ──${NC}"
-    echo -e "  ${BOLD}9.${NC} Перезапустить Xray"
-    echo -e "  ${BOLD}10.${NC} Статус и логи"
-    echo -e "  ${BOLD}11.${NC} Обновить скрипт"
+    echo -e "  ${BOLD}10.${NC} Перезапустить Xray"
+    echo -e "  ${BOLD}11.${NC} Статус и логи"
+    echo -e "  ${BOLD}12.${NC} Обновить скрипт"
     echo -e "  ${BOLD}0.${NC} Выйти"
     echo ""
     read -rp "  Выбор: " CHOICE
@@ -1169,10 +1273,11 @@ menu() {
       4) show_user_link; echo ""; read -rp "  Enter..." _ ;;
       5) show_all_links; echo ""; read -rp "  Enter..." _ ;;
       6) install_protocol ;;
-      7) warp_menu ;;
-      8) multihop_menu ;;
-      9) systemctl restart xray; echo -e "  ${GREEN}✓ Перезапущен${NC}"; sleep 1 ;;
-      10)
+      7) cert_menu ;;
+      8) warp_menu ;;
+      9) multihop_menu ;;
+      10) systemctl restart xray; echo -e "  ${GREEN}✓ Перезапущен${NC}"; sleep 1 ;;
+      11)
         echo ""
         systemctl status xray --no-pager
         echo ""
@@ -1180,7 +1285,7 @@ menu() {
         echo ""
         read -rp "  Enter..." _
         ;;
-      11)
+      12)
         curl -sSL "$SCRIPT_URL" -o /root/xray.sh
         chmod +x /root/xray.sh
         echo -e "  ${GREEN}✓ Скрипт обновлён${NC}"
